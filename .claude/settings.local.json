@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npm list *)",
+      "Bash(git count-objects *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git stash *)",
+      "Bash(git check-ignore *)",
+      "Bash(xxd \"C:\\\\Users\\\\leona\\\\Documents\\\\GitHub\\\\Schichter\\\\.gitignore\")"
+    ]
+  }
+}
