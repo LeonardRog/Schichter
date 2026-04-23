@@ -12,7 +12,10 @@
       "Bash(git branch *)",
       "Bash(git stash *)",
       "Bash(git check-ignore *)",
-      "Bash(xxd \"C:\\\\Users\\\\leona\\\\Documents\\\\GitHub\\\\Schichter\\\\.gitignore\")"
+      "Bash(xxd \"C:\\\\Users\\\\leona\\\\Documents\\\\GitHub\\\\Schichter\\\\.gitignore\")",
+      "Bash(git rm *)",
+      "Bash(git reflog *)",
+      "Bash(git gc *)"
     ]
   }
 }
