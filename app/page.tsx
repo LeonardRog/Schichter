@@ -66,8 +66,14 @@ export default function Home() {
     const formData = new FormData();
     formData.append('image', image);
     formData.append('lastName', lastName.trim());
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 65_000);
     try {
-      const res = await fetch('/api/analyze', { method: 'POST', body: formData });
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
       const data = await res.json();
       if (data.error) {
         setError(data.error);
@@ -75,9 +81,14 @@ export default function Home() {
         setShiftData(data);
         setStep(2);
       }
-    } catch {
-      setError('Analysefehler. Bitte versuche es erneut.');
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Die Analyse hat zu lange gedauert. Bitte ein kleineres oder klareres Foto verwenden.');
+      } else {
+        setError('Analysefehler. Bitte versuche es erneut.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setIsAnalyzing(false);
     }
   };
