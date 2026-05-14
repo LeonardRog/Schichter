@@ -85,10 +85,11 @@ Schichtcodes:
 - S = Spätdienst
 - N = Nachtdienst
 - S1 = früherer Spätdienst
-- / oder // = frei/Urlaub/Wochenende (leer lassen oder als "/" eintragen)
+- U = Urlaub (als "U" eintragen, NICHT als "/")
+- / oder // = frei/Wochenende (kein Urlaub)
 
 Antworte AUSSCHLIESSLICH mit diesem JSON — kein Markdown, kein erklärender Text:
-{"employee":"vollständiger Name","month":"YYYY-MM","shifts":{"1":"F","2":"/","3":"S"}}
+{"employee":"vollständiger Name","month":"YYYY-MM","shifts":{"1":"F","2":"/","3":"S","4":"U"}}
 
 Alle Tage des Monats müssen in "shifts" vorkommen.
 Falls der Mitarbeiter nicht gefunden wird: {"error":"Mitarbeiter nicht gefunden"}

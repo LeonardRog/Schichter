@@ -4,6 +4,7 @@ export interface ShiftInfo {
   endTime: string;
   nextDay?: boolean;
   reminder?: boolean;
+  allDay?: boolean;
   bgColor: string;
   textColor: string;
 }
@@ -38,6 +39,14 @@ export const SHIFTS: Record<string, ShiftInfo> = {
     reminder: true,
     bgColor: 'bg-yellow-100',
     textColor: 'text-yellow-800',
+  },
+  U: {
+    title: 'U – Urlaub',
+    startTime: '',
+    endTime: '',
+    allDay: true,
+    bgColor: 'bg-green-100',
+    textColor: 'text-green-800',
   },
 };
 

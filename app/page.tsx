@@ -9,6 +9,12 @@ interface ShiftData {
   shifts: Record<string, string>;
 }
 
+interface CalendarEvent {
+  day: string;
+  eventId: string;
+  code: string;
+}
+
 type Step = 1 | 2 | 3;
 
 export default function Home() {
@@ -22,6 +28,9 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAddingEvents, setIsAddingEvents] = useState(false);
   const [addedCount, setAddedCount] = useState<number | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [editingDay, setEditingDay] = useState<string | null>(null);
+  const [updatingDay, setUpdatingDay] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -117,6 +126,7 @@ export default function Home() {
       }
       const data = await res.json();
       setAddedCount(data.addedCount);
+      setCalendarEvents(data.events ?? []);
     } catch {
       setError('Fehler beim Hinzufügen. Bitte versuche es erneut.');
     } finally {
@@ -133,7 +143,33 @@ export default function Home() {
     setError('');
     setIsAuthenticated(false);
     setAddedCount(null);
+    setCalendarEvents([]);
+    setEditingDay(null);
+    setUpdatingDay(null);
     sessionStorage.removeItem('schichtplan_data');
+  };
+
+  const updateShift = async (day: string, eventId: string, newCode: string) => {
+    if (!shiftData) return;
+    setUpdatingDay(day);
+    setError('');
+    try {
+      const res = await fetch('/api/calendar', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, newCode, day, month: shiftData.month }),
+      });
+      if (res.ok) {
+        setCalendarEvents((prev) => prev.map((e) => (e.day === day ? { ...e, code: newCode } : e)));
+        setEditingDay(null);
+      } else {
+        setError('Fehler beim Aktualisieren der Schicht.');
+      }
+    } catch {
+      setError('Fehler beim Aktualisieren der Schicht.');
+    } finally {
+      setUpdatingDay(null);
+    }
   };
 
   const getDaysInMonth = (m: string) => {
@@ -312,7 +348,8 @@ export default function Home() {
                       {getDayLabel(shiftData.month, day)}&nbsp;{day}.
                     </span>
                     <span className={`text-sm font-semibold ${shift.textColor}`}>
-                      {shift.title} &bull; {shift.startTime}&#8211;{shift.endTime}
+                      {shift.title}
+                      {!shift.allDay && <> &bull; {shift.startTime}&#8211;{shift.endTime}</>}
                       {shift.reminder && (
                         <span className="ml-1 text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded-full">
                           Erinnerung
@@ -349,13 +386,69 @@ export default function Home() {
         {step === 3 && shiftData && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-5">
             {addedCount !== null ? (
-              <div className="text-center space-y-4 py-6">
-                <div className="text-6xl">&#x2705;</div>
-                <h2 className="font-semibold text-xl text-slate-800">Fertig!</h2>
-                <p className="text-slate-600">
-                  <span className="font-bold text-blue-600">{addedCount} Schichten</span> wurden zu
-                  deinem Google Kalender hinzugefügt.
-                </p>
+              <div className="space-y-5 py-2">
+                <div className="text-center space-y-2">
+                  <div className="text-6xl">&#x2705;</div>
+                  <h2 className="font-semibold text-xl text-slate-800">Fertig!</h2>
+                  <p className="text-slate-600">
+                    <span className="font-bold text-blue-600">{addedCount} Schichten</span> wurden zu
+                    deinem Google Kalender hinzugefügt.
+                  </p>
+                </div>
+
+                {calendarEvents.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-0.5">
+                      Schichten bearbeiten
+                    </p>
+                    <div className="max-h-72 overflow-y-auto space-y-1 -mx-1 px-1">
+                      {[...calendarEvents]
+                        .sort((a, b) => parseInt(a.day, 10) - parseInt(b.day, 10))
+                        .map(({ day, eventId, code: currentCode }) => {
+                          const shift = SHIFTS[currentCode.toUpperCase()];
+                          const isEditing = editingDay === day;
+                          const isUpdating = updatingDay === day;
+                          return (
+                            <div key={day} className="rounded-xl border border-slate-200 overflow-hidden">
+                              <button
+                                onClick={() => setEditingDay(isEditing ? null : day)}
+                                disabled={isUpdating}
+                                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${shift?.bgColor ?? 'bg-slate-50'} disabled:opacity-60`}
+                              >
+                                <span className="text-slate-700 text-sm font-medium">
+                                  {getDayLabel(shiftData.month, parseInt(day, 10))}&nbsp;{day}.
+                                </span>
+                                <span className={`text-sm font-semibold flex items-center gap-1.5 ${shift?.textColor ?? 'text-slate-600'}`}>
+                                  {isUpdating && <Spinner />}
+                                  {currentCode.toUpperCase()}
+                                  {!isUpdating && (
+                                    <svg className="w-3.5 h-3.5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828A2 2 0 0110 16.414H8v-2a2 2 0 01.586-1.414z" />
+                                    </svg>
+                                  )}
+                                </span>
+                              </button>
+                              {isEditing && (
+                                <div className="flex gap-2 p-2.5 bg-slate-50 border-t border-slate-100 flex-wrap">
+                                  {Object.entries(SHIFTS).map(([code, info]) => (
+                                    <button
+                                      key={code}
+                                      disabled={isUpdating}
+                                      onClick={() => updateShift(day, eventId, code)}
+                                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${info.bgColor} ${info.textColor} ${code === currentCode.toUpperCase() ? 'ring-2 ring-offset-1 ring-slate-400' : 'opacity-70 hover:opacity-100'} disabled:opacity-30`}
+                                    >
+                                      {code}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={reset}
                   className="w-full py-3 border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
