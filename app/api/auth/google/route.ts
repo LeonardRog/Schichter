@@ -11,6 +11,7 @@ function getOAuth2Client() {
 
 export async function GET() {
   const oauth2Client = getOAuth2Client();
+  console.log('[auth/google] GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI);
 
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
