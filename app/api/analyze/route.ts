@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     }
 
     const middlewareData = await middlewareRes.json();
-    const base64 = middlewareData.base64 as string | undefined;
+    const base64 = middlewareData.image as string | undefined;
 
     if (!base64) {
       console.error('[analyze] Middleware returned no base64 data:', JSON.stringify(middlewareData));
