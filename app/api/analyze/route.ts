@@ -1,10 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
-import sharp from 'sharp';
 
 export const maxDuration = 60;
 
 const client = new Anthropic();
+const MIDDLEWARE_URL = 'http://159.69.153.61:3001/process';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
 type AllowedType = (typeof ALLOWED_TYPES)[number];
@@ -40,14 +40,37 @@ export async function POST(req: Request) {
       );
     }
 
-    const rawBuffer = Buffer.from(await image.arrayBuffer());
-    const compressed = await sharp(rawBuffer)
-      .resize({ width: 1500, withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-    console.log('[analyze] Compressed — original:', (rawBuffer.length / 1024).toFixed(1), 'KB → compressed:', (compressed.length / 1024).toFixed(1), 'KB');
+    console.log('[analyze] Sending image to middleware for processing...');
+    const middlewareForm = new FormData();
+    middlewareForm.append('image', image);
 
-    const base64 = compressed.toString('base64');
+    const middlewareRes = await fetch(MIDDLEWARE_URL, {
+      method: 'POST',
+      body: middlewareForm,
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!middlewareRes.ok) {
+      const errText = await middlewareRes.text().catch(() => '');
+      console.error('[analyze] Middleware error:', middlewareRes.status, errText);
+      return NextResponse.json(
+        { error: 'Fehler bei der Bildverarbeitung. Bitte erneut versuchen.' },
+        { status: 502 }
+      );
+    }
+
+    const middlewareData = await middlewareRes.json();
+    const base64 = middlewareData.base64 as string | undefined;
+
+    if (!base64) {
+      console.error('[analyze] Middleware returned no base64 data:', JSON.stringify(middlewareData));
+      return NextResponse.json(
+        { error: 'Fehler bei der Bildverarbeitung. Bitte erneut versuchen.' },
+        { status: 502 }
+      );
+    }
+
+    console.log('[analyze] Middleware processed image — base64 length:', base64.length);
 
     console.log('[analyze] Calling Anthropic API...');
     const response = await client.messages.create(
