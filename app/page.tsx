@@ -216,8 +216,15 @@ export default function Home() {
   const countShifts = (data: ShiftData) =>
     Object.values(data.shifts).filter((c) => !isOff(c) && SHIFTS[c.toUpperCase()]).length;
 
+  const commitSha = process.env.NEXT_PUBLIC_COMMIT_SHA ?? 'local';
+  const shortSha = commitSha === 'local' ? 'local' : commitSha.slice(0, 7);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Version badge */}
+      <div className="fixed bottom-2 right-2 z-50 text-[10px] font-mono text-slate-400 bg-white/70 backdrop-blur px-1.5 py-0.5 rounded border border-slate-200 select-none">
+        {shortSha}
+      </div>
       <div className="max-w-lg mx-auto px-4 py-8 pb-16">
         {/* Header */}
         <div className="text-center mb-8">
