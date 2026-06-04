@@ -112,6 +112,13 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldAutoAdd, isAuthenticated, step]);
 
+  // Scroll the edit-options panel into view whenever a day is opened for editing
+  useEffect(() => {
+    if (!editingDay) return;
+    const el = document.querySelector<HTMLElement>(`[data-edit-panel="${editingDay}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [editingDay]);
+
   const updateLocalShift = (day: string, newCode: string) => {
     if (!shiftData) return;
     setShiftData({ ...shiftData, shifts: { ...shiftData.shifts, [day]: newCode } });
@@ -405,7 +412,7 @@ export default function Home() {
                     </button>
 
                     {isEditing && (
-                      <div className="flex gap-2 p-2.5 bg-slate-50 border-t border-slate-100 flex-wrap">
+                      <div data-edit-panel={day.toString()} className="flex gap-2 p-2.5 bg-slate-50 border-t border-slate-100 flex-wrap">
                         {Object.entries(SHIFTS).map(([c, info]) => (
                           <button
                             key={c}
@@ -497,7 +504,7 @@ export default function Home() {
                                 </span>
                               </button>
                               {isEditing && (
-                                <div className="flex gap-2 p-2.5 bg-slate-50 border-t border-slate-100 flex-wrap">
+                                <div data-edit-panel={day} className="flex gap-2 p-2.5 bg-slate-50 border-t border-slate-100 flex-wrap">
                                   {Object.entries(SHIFTS).map(([code, info]) => (
                                     <button
                                       key={code}
