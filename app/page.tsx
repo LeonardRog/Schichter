@@ -62,7 +62,7 @@ export default function Home() {
     (e: React.DragEvent) => {
       e.preventDefault();
       const file = e.dataTransfer.files[0];
-      if (file && file.type.startsWith('image/')) handleFileChange(file);
+      if (file) handleFileChange(file);
     },
     [handleFileChange]
   );
@@ -280,7 +280,7 @@ export default function Home() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];

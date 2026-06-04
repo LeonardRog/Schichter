@@ -6,8 +6,9 @@ export const maxDuration = 60;
 const client = new Anthropic();
 const MIDDLEWARE_URL = 'http://159.69.153.61:3001/process';
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
-type AllowedType = (typeof ALLOWED_TYPES)[number];
+// iOS (HEIC/HEIF), Android, and some mobile browsers send non-standard or empty MIME types.
+// We accept any image/* type plus common aliases; the middleware handles conversion.
+const BLOCKED_TYPES = ['application/pdf', 'text/', 'video/', 'audio/'];
 
 export async function POST(req: Request) {
   try {
@@ -24,18 +25,20 @@ export async function POST(req: Request) {
 
     console.log('[analyze] Image — name:', image.name, '| type:', image.type, '| size:', (image.size / 1024).toFixed(1), 'KB');
 
-    if (!ALLOWED_TYPES.includes(image.type as AllowedType)) {
+    // Reject clearly non-image types; allow empty/unknown (common on iOS HEIC uploads)
+    const mimeType = image.type.toLowerCase();
+    if (mimeType && BLOCKED_TYPES.some((t) => mimeType.startsWith(t))) {
       console.log('[analyze] Validation failed: unsupported type', image.type);
       return NextResponse.json(
-        { error: 'Nur JPEG, PNG, GIF oder WebP erlaubt.' },
+        { error: 'Bitte ein Foto im Format JPEG, PNG oder HEIC hochladen.' },
         { status: 400 }
       );
     }
 
-    if (image.size > 5 * 1024 * 1024) {
+    if (image.size > 20 * 1024 * 1024) {
       console.log('[analyze] Validation failed: image too large', (image.size / 1024 / 1024).toFixed(2), 'MB');
       return NextResponse.json(
-        { error: 'Bild zu groß. Bitte maximal 5 MB.' },
+        { error: 'Bild zu groß. Bitte maximal 20 MB.' },
         { status: 400 }
       );
     }
