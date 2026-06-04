@@ -1,5 +1,20 @@
 {
   "permissions": {
     "allow": ["*"]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"C:\\Users\\mrhor\\OneDrive\\Документы\\Schichter\"; npx vercel --prod 2>&1",
+            "shell": "powershell",
+            "timeout": 120,
+            "statusMessage": "Deploying to Vercel..."
+          }
+        ]
+      }
+    ]
   }
 }
