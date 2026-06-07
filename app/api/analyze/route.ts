@@ -96,31 +96,37 @@ export async function POST(req: Request) {
                 type: 'text',
                 text: `Du analysierst einen deutschen Dienstplan (Schichtplan).
 
-Das Bild zeigt eine Tabelle:
-- Linke Spalte: Mitarbeiternamen (Vor- und/oder Nachname)
-- Obere Zeile: Tage des Monats (1, 2, 3, ... bis 28/30/31)
-- Zellen: Schichtcodes (gedruckt oder handschriftlich)
+TABELLENSTRUKTUR:
+- Spalten = Tage des Monats (1, 2, 3, ... bis 28/30/31), von links nach rechts
+- Zeilen = Mitarbeiter, jeweils mit Name in der ganz linken Spalte
+- Zellen enthalten gedruckte Schichtcodes, manchmal mit handschriftlichen Ergänzungen
 
-Aufgabe:
-1. Finde die Zeile des Mitarbeiters mit dem Nachnamen: "${lastName}"
+AUFGABE:
+1. Suche in der ganz linken Spalte nach dem Nachnamen: "${lastName}"
+   - Vergleiche nur den Nachnamen, ignoriere Vornamen
+   - Groß-/Kleinschreibung ignorieren
 2. Bestimme Monat und Jahr des Dienstplans
 3. Lies jeden Schichtcode für alle Tage dieser Zeile
 
-WICHTIG — Schichttausch (handschriftliche Korrekturen):
-Mitarbeiter tauschen manchmal Schichten untereinander. In solchen Fällen stehen
-unter der gedruckten Zeile des Mitarbeiters zwei handschriftliche Zeilen:
-  - Zeile 2 (direkt darunter): der neue Schichtcode nach dem Tausch — DIESER GILT.
-  - Zeile 3 (darunter): Initialen des Tauschpartners — diese ignorieren.
-Wenn für einen Tag ein handschriftlicher Schichtcode in Zeile 2 vorhanden ist,
-überschreibt dieser den gedruckten Wert. Nur Zeile 2 zählt, Zeile 3 (Initialen) ignorieren.
+HANDSCHRIFTLICHE INITIALEN — IGNORIEREN:
+In manchen Zellen stehen 2–3 handgeschriebene Buchstaben neben dem Schichtcode (Initialen des Tauschpartners).
+Diese Initialen sind KEINE Schichtcodes — sie müssen vollständig ignoriert werden.
 
-Schichtcodes:
-- F = Frühdienst
-- S = Spätdienst
-- N = Nachtdienst
+SCHICHTTAUSCH (handschriftliche Schichtcodes):
+Wenn unterhalb der gedruckten Zeile eines Mitarbeiters handschriftliche Korrekturen erscheinen:
+  - Direkt darunter (Zeile 2): neuer Schichtcode nach dem Tausch — DIESER ÜBERSCHREIBT den gedruckten Wert.
+  - Noch weiter darunter (Zeile 3): Initialen des Tauschpartners — ignorieren.
+
+ERLAUBTE SCHICHTCODES — NUR diese dürfen in der Ausgabe erscheinen:
+- F  = Frühdienst
+- S  = Spätdienst
+- N  = Nachtdienst
 - S1 = früherer Spätdienst
-- U = Urlaub (als "U" eintragen, NICHT als "/")
-- / oder // = frei/Wochenende (kein Urlaub)
+- U  = Urlaub (als "U" ausgeben, NICHT als "/")
+- /  = frei / Wochenende (kein Urlaub)
+
+Wenn ein Wert unklar oder nicht eindeutig lesbar ist: gib "/" aus — NICHT raten.
+Gib NIEMALS andere Buchstaben oder Zeichen aus.
 
 Antworte AUSSCHLIESSLICH mit diesem JSON — kein Markdown, kein erklärender Text:
 {"employee":"vollständiger Name","month":"YYYY-MM","shifts":{"1":"F","2":"/","3":"S","4":"U"}}
