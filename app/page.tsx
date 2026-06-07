@@ -7,6 +7,7 @@ interface ShiftData {
   employee: string;
   month: string;
   shifts: Record<string, string>;
+  uncertain?: string[];
 }
 
 interface CalendarEvent {
@@ -121,7 +122,11 @@ export default function Home() {
 
   const updateLocalShift = (day: string, newCode: string) => {
     if (!shiftData) return;
-    setShiftData({ ...shiftData, shifts: { ...shiftData.shifts, [day]: newCode } });
+    setShiftData({
+      ...shiftData,
+      shifts: { ...shiftData.shifts, [day]: newCode },
+      uncertain: shiftData.uncertain?.filter((d) => d !== day),
+    });
     setEditingDay(null);
   };
 
@@ -374,6 +379,17 @@ export default function Home() {
 
             <p className="text-xs text-slate-400">Tippe auf einen Tag, um die Schicht zu korrigieren.</p>
 
+            {/* Uncertain days banner */}
+            {shiftData.uncertain && shiftData.uncertain.length > 0 && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs">
+                <span className="shrink-0 mt-0.5">&#x26A0;</span>
+                <span>
+                  <span className="font-semibold">{shiftData.uncertain.length} Tag{shiftData.uncertain.length > 1 ? 'e' : ''} unsicher</span>
+                  {' '}— die beiden Analysedurchläufe waren sich uneinig. Bitte prüfen und korrigieren.
+                </span>
+              </div>
+            )}
+
             {/* All days — editable */}
             <div className="space-y-1 max-h-[22rem] overflow-y-auto -mx-1 px-1">
               {Array.from({ length: getDaysInMonth(shiftData.month) }, (_, i) => i + 1).map((day) => {
@@ -381,18 +397,25 @@ export default function Home() {
                 const dayOff = isOff(rawCode);
                 const code = dayOff ? '/' : rawCode.toUpperCase();
                 const shift = dayOff ? null : SHIFTS[code];
-                const bgColor = shift?.bgColor ?? 'bg-slate-50';
-                const textColor = shift?.textColor ?? 'text-slate-400';
+                const isUncertain = shiftData.uncertain?.includes(day.toString()) ?? false;
+                const bgColor = isUncertain ? 'bg-amber-50' : (shift?.bgColor ?? 'bg-slate-50');
+                const textColor = isUncertain ? 'text-amber-700' : (shift?.textColor ?? 'text-slate-400');
+                const borderColor = isUncertain ? 'border-amber-200' : 'border-slate-100';
                 const isEditing = editingDay === day.toString();
 
                 return (
-                  <div key={day} className="rounded-xl border border-slate-100 overflow-hidden">
+                  <div key={day} className={`rounded-xl border overflow-hidden ${borderColor}`}>
                     <button
                       onClick={() => setEditingDay(isEditing ? null : day.toString())}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${bgColor}`}
                     >
-                      <span className="text-slate-600 text-sm font-medium">
+                      <span className={`text-sm font-medium flex items-center gap-1.5 ${isUncertain ? 'text-amber-800' : 'text-slate-600'}`}>
                         {getDayLabel(shiftData.month, day)}&nbsp;{day}.
+                        {isUncertain && (
+                          <span className="text-[10px] font-semibold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full leading-none">
+                            ?
+                          </span>
+                        )}
                       </span>
                       <span className={`text-sm font-semibold flex items-center gap-1.5 ${textColor}`}>
                         {dayOff ? (

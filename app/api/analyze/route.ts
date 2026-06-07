@@ -75,90 +75,134 @@ export async function POST(req: Request) {
 
     console.log('[analyze] Middleware processed image — base64 length:', base64.length);
 
-    console.log('[analyze] Calling Anthropic API...');
-    const response = await client.messages.create(
-      {
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: 'image/jpeg',
-                  data: base64,
-                },
-              },
-              {
-                type: 'text',
-                text: `Du analysierst einen deutschen Dienstplan (Schichtplan).
+    const imageContent = {
+      type: 'image' as const,
+      source: {
+        type: 'base64' as const,
+        media_type: 'image/jpeg' as const,
+        data: base64,
+      },
+    };
 
-TABELLENSTRUKTUR:
-- Spalten = Tage des Monats (1, 2, 3, ... bis 28/30/31), von links nach rechts
-- Zeilen = Mitarbeiter, jeweils mit Name in der ganz linken Spalte
-- Zellen enthalten gedruckte Schichtcodes, manchmal mit handschriftlichen Ergänzungen
-
-AUFGABE:
-1. Suche in der ganz linken Spalte nach dem Nachnamen: "${lastName}"
-   - Vergleiche nur den Nachnamen, ignoriere Vornamen
-   - Groß-/Kleinschreibung ignorieren
-2. Bestimme Monat und Jahr des Dienstplans
-3. Lies jeden Schichtcode für alle Tage dieser Zeile
-
-HANDSCHRIFTLICHE INITIALEN — IGNORIEREN:
-In manchen Zellen stehen 2–3 handgeschriebene Buchstaben neben dem Schichtcode (Initialen des Tauschpartners).
-Diese Initialen sind KEINE Schichtcodes — sie müssen vollständig ignoriert werden.
-
-SCHICHTTAUSCH (handschriftliche Schichtcodes):
-Wenn unterhalb der gedruckten Zeile eines Mitarbeiters handschriftliche Korrekturen erscheinen:
-  - Direkt darunter (Zeile 2): neuer Schichtcode nach dem Tausch — DIESER ÜBERSCHREIBT den gedruckten Wert.
-  - Noch weiter darunter (Zeile 3): Initialen des Tauschpartners — ignorieren.
-
-ERLAUBTE SCHICHTCODES — NUR diese dürfen in der Ausgabe erscheinen:
-- F  = Frühdienst
-- S  = Spätdienst
-- N  = Nachtdienst
-- S1 = früherer Spätdienst
-- U  = Urlaub (als "U" ausgeben, NICHT als "/")
-- /  = frei / Wochenende (kein Urlaub)
-
-Wenn ein Wert unklar oder nicht eindeutig lesbar ist: gib "/" aus — NICHT raten.
-Gib NIEMALS andere Buchstaben oder Zeichen aus.
-
-Antworte AUSSCHLIESSLICH mit diesem JSON — kein Markdown, kein erklärender Text:
+    const JSON_FORMAT = `Antworte AUSSCHLIESSLICH mit diesem JSON — kein Markdown, kein erklärender Text:
 {"employee":"vollständiger Name","month":"YYYY-MM","shifts":{"1":"F","2":"/","3":"S","4":"U"}}
 
 Alle Tage des Monats müssen in "shifts" vorkommen.
 Falls der Mitarbeiter nicht gefunden wird: {"error":"Mitarbeiter nicht gefunden"}
-Falls kein Dienstplan erkennbar: {"error":"Kein Dienstplan erkannt"}`,
-              },
-            ],
-          },
-        ],
-      },
-      { signal: AbortSignal.timeout(55_000) }
-    );
+Falls kein Dienstplan erkennbar: {"error":"Kein Dienstplan erkannt"}`;
 
-    console.log('[analyze] Anthropic response received — stop_reason:', response.stop_reason, '| usage:', JSON.stringify(response.usage));
+    const prompt1 = `You are analyzing a German work schedule table (Dienstplan). Find the row for "${lastName}" and extract shift codes strictly from that row only.
 
-    const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
-    console.log('[analyze] Raw response text:', raw);
+TABELLENSTRUKTUR:
+- Spalten = Tage des Monats (1 bis 28/30/31), von links nach rechts
+- Zeilen = Mitarbeiter, Name ganz links
+- Suche den Nachnamen "${lastName}" in der ganz linken Spalte (Groß-/Kleinschreibung ignorieren)
 
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.log('[analyze] Failed to extract JSON from response');
+HANDSCHRIFTLICHE INITIALEN — IGNORIEREN:
+2–3 handgeschriebene Buchstaben neben einem Schichtcode sind Initialen des Tauschpartners — ignorieren.
+
+SCHICHTTAUSCH: Handschriftlicher Code direkt unterhalb der gedruckten Zeile überschreibt den gedruckten Wert.
+
+ERLAUBTE SCHICHTCODES (nur diese ausgeben): F, S, N, S1, U, /
+Wenn unklar: "/" ausgeben, nicht raten.
+
+${JSON_FORMAT}`;
+
+    const prompt2 = `You are a careful data extractor. In this German Dienstplan table, locate "${lastName}" in the leftmost column and read each cell in that row left to right. Valid codes are F, S, N, S1, U. Empty cells or slashes are days off (output as "/").
+
+TABELLENSTRUKTUR:
+- Spalten = Tage des Monats (1 bis 28/30/31), von links nach rechts
+- Zeilen = Mitarbeiter, Name ganz links
+- Nachnamen "${lastName}" in der linken Spalte finden (Groß-/Kleinschreibung ignorieren)
+
+HANDSCHRIFTLICHE INITIALEN — IGNORIEREN:
+2–3 handgeschriebene Buchstaben neben einem Schichtcode sind Initialen — keine Schichtcodes, vollständig ignorieren.
+
+SCHICHTTAUSCH: Steht handschriftlich ein Schichtcode direkt unter der gedruckten Zeile, gilt dieser statt des gedruckten.
+
+ERLAUBTE SCHICHTCODES (nur diese ausgeben): F, S, N, S1, U, /
+Bei Unklarheit "/" ausgeben.
+
+${JSON_FORMAT}`;
+
+    console.log('[analyze] Calling Anthropic API (two parallel passes)...');
+    const [res1, res2] = await Promise.all([
+      client.messages.create(
+        { model: 'claude-sonnet-4-6', max_tokens: 2048, messages: [{ role: 'user', content: [imageContent, { type: 'text', text: prompt1 }] }] },
+        { signal: AbortSignal.timeout(55_000) }
+      ),
+      client.messages.create(
+        { model: 'claude-sonnet-4-6', max_tokens: 2048, messages: [{ role: 'user', content: [imageContent, { type: 'text', text: prompt2 }] }] },
+        { signal: AbortSignal.timeout(55_000) }
+      ),
+    ]);
+
+    console.log('[analyze] Pass 1 — stop_reason:', res1.stop_reason, '| usage:', JSON.stringify(res1.usage));
+    console.log('[analyze] Pass 2 — stop_reason:', res2.stop_reason, '| usage:', JSON.stringify(res2.usage));
+
+    const parsePass = (res: typeof res1, passLabel: string) => {
+      const raw = res.content[0].type === 'text' ? res.content[0].text.trim() : '';
+      console.log(`[analyze] ${passLabel} raw:`, raw);
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) return null;
+      try { return JSON.parse(match[0]); } catch { return null; }
+    };
+
+    const data1 = parsePass(res1, 'Pass 1');
+    const data2 = parsePass(res2, 'Pass 2');
+
+    // If either pass returned a hard error, propagate it
+    const hardError = [data1, data2].find((d) => d?.error);
+    if (hardError) {
+      console.log('[analyze] Hard error from a pass:', hardError.error);
+      return NextResponse.json(hardError);
+    }
+
+    if (!data1 && !data2) {
+      console.log('[analyze] Both passes failed to return parseable JSON');
       return NextResponse.json(
         { error: 'Konnte keine Schichtdaten lesen. Bitte Foto-Qualität prüfen.' },
         { status: 500 }
       );
     }
 
-    const data = JSON.parse(jsonMatch[0]);
-    console.log('[analyze] Parsed result:', JSON.stringify(data));
-    return NextResponse.json(data);
+    // Fall back to whichever pass succeeded if one failed
+    const base = data1 ?? data2;
+    const other = data1 && data2 ? data2 : null;
+
+    if (!other) {
+      console.log('[analyze] Only one pass succeeded, returning without uncertainty data');
+      return NextResponse.json(base);
+    }
+
+    // Compare day by day
+    const normalize = (v: string | undefined): string => {
+      if (!v) return '/';
+      const u = v.trim().toUpperCase();
+      if (u === '' || u === '//' || u === '-') return '/';
+      return u;
+    };
+
+    const allDays = Object.keys(base.shifts ?? {});
+    const uncertain: string[] = [];
+    const mergedShifts: Record<string, string> = {};
+
+    for (const day of allDays) {
+      const c1 = normalize(base.shifts[day]);
+      const c2 = normalize((other.shifts ?? {})[day]);
+      if (c1 === c2) {
+        mergedShifts[day] = c1;
+      } else {
+        uncertain.push(day);
+        mergedShifts[day] = c1; // pass 1 takes precedence; user will review
+      }
+    }
+
+    console.log('[analyze] Uncertain days:', uncertain);
+
+    const merged = { employee: base.employee, month: base.month, shifts: mergedShifts, uncertain };
+    console.log('[analyze] Merged result:', JSON.stringify(merged));
+    return NextResponse.json(merged);
   } catch (err) {
     console.error('[analyze] Error:', err);
     const isTimeout =
